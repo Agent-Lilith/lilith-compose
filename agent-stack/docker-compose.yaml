@@ -1,0 +1,178 @@
+name: agent-stack
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: lilith-pgvector
+    env_file: .env
+    ports:
+      - "6100:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${POSTGRES_DATA_DIR}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6101:8080"
+    environment:
+      # Base configuration
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://localhost:6101/}
+      - INSTANCE_NAME=${INSTANCE_NAME:-searxng}
+
+      # API access
+      - ENABLE_JSON=true
+      - ENABLE_CORS=true
+
+      # Security (set in .env)
+      - SECRET_KEY=${SEARXNG_SECRET_KEY}
+      - SAFE_SEARCH=1
+      - RATE_LIMIT=30
+      - LIMITER=false
+
+      # Performance optimizations for agent usage
+      - MAX_RESULTS=5
+      - TIMEOUT=15
+      - UWSGI_WORKERS=4
+      - UWSGI_THREADS=2
+
+      # Privacy
+      - DO_NOT_TRACK=true
+      - REFERRER_POLICY=no-referrer
+
+      # Agent optimizations
+      - AUTOCOMPLETE=false
+      - DEFAULT_LANG=en
+      - SEARCH_FORMATS=json,html
+    volumes:
+      - ./searxng:/etc/searxng
+    networks:
+      - agent-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
+  flaresolverr:
+    image: flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6102:8191"
+    environment:
+      # Logging
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+
+      # Performance optimizations
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
+
+      # Timeout settings for agent usage
+      - TIMEOUT=60000
+      - BROWSER_TIMEOUT=40000
+
+      # Headless mode (required for server environments)
+      - HEADLESS=true
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8191/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits to prevent memory issues
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1G
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: crawl4ai
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6103:11235"
+    environment:
+      # API Configuration
+      - PORT=11235
+      - HOST=0.0.0.0
+
+      # Performance optimizations
+      - MAX_CONCURRENT_REQUESTS=10
+      - PLAYWRIGHT_TIMEOUT=30000
+      - PAGE_TIMEOUT=60000
+
+      # Browser settings
+      - HEADLESS=true
+      - BROWSER_TYPE=chromium
+
+      # Cache settings for faster repeated crawls
+      - ENABLE_CACHE=true
+      - CACHE_TTL=3600
+
+      # Resource management
+      - MAX_PAGES_PER_SESSION=50
+      - MEMORY_THRESHOLD=80
+
+      # Logging
+      - LOG_LEVEL=INFO
+    volumes:
+      # Persistent cache for better performance
+      - crawl4ai-cache:/app/cache
+      # Optional: Custom browser profiles
+      - ./crawl4ai/profiles:/app/profiles
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: "3.0"
+        reservations:
+          memory: 2G
+          cpus: "1"
+    # Shared memory size for Chromium
+    shm_size: 3gb
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  crawl4ai-cache:
+    driver: local

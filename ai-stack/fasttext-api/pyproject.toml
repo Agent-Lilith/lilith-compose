@@ -1,0 +1,16 @@
+[project]
+name = "fasttext-langdetect-api"
+version = "1.0.0"
+description = "FastAPI service for fastText language detection"
+requires-python = ">=3.12"
+dependencies = [
+    "fasttext==0.9.3",
+    "fastapi==0.115.5",
+    "uvicorn[standard]==0.32.1",
+    "numpy<2.0",  # Pin to numpy 1.x for fasttext compatibility
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+

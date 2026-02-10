@@ -1,0 +1,14 @@
+# Env (secrets). Do not commit .env
+.env
+.env.local
+**/.env
+!**/.env.example
+
+# Docker
+.docker/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+Thumbs.db

@@ -1,0 +1,129 @@
+name: ai-stack
+
+services:
+  vllm:
+    image: vllm/vllm-openai:v0.13.0-x86_64
+    container_name: vllm
+    restart: unless-stopped
+    runtime: nvidia
+    env_file: .env
+    volumes:
+      - ${MODELS_DIR}:/models
+    ports:
+      - "6001:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MODEL_PATH=${MODEL_PATH}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      --model ${MODEL_PATH}
+      --dtype float16
+      --quantization awq_marlin
+      --gpu-memory-utilization 0.85
+      --max-model-len 8192
+      --host 0.0.0.0
+      --port 8000
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6002:9000"
+    environment:
+      - ASR_MODEL=small
+      - ASR_ENGINE=faster_whisper
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+    volumes:
+      - ${MODELS_DIR}/whisper-cache:/root/.cache
+
+  embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    container_name: embedding
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6003:80"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - HUGGINGFACE_HUB_CACHE=/data
+      - MAX_CONCURRENT_REQUESTS=512
+      - MAX_BATCH_TOKENS=16384
+      - MAX_CLIENT_BATCH_SIZE=128
+    volumes:
+      - ${MODELS_DIR}/huggingface-cache:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 16G
+        reservations:
+          cpus: "4.0"
+          memory: 8G
+    command: >
+      --model-id nomic-ai/nomic-embed-text-v1.5
+      --port 80
+      --hostname 0.0.0.0
+      --dtype float32
+      --pooling mean
+      --max-concurrent-requests 512
+      --max-batch-tokens 16384
+      --max-client-batch-size 128
+
+  spacy:
+    image: lilith-spacy
+    build:
+      context: ./spacy-api
+      dockerfile: Dockerfile
+    container_name: spacy
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - SPACY_DATA=/data
+    volumes:
+      - ${MODELS_DIR}/spacy:/data
+    ports:
+      - "127.0.0.1:6004:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  fasttext-langdetect:
+    image: lilith-fasttext-langdetect
+    build:
+      context: ./fasttext-api
+      dockerfile: Dockerfile
+    container_name: fasttext-langdetect
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:6005:8000"
+    volumes:
+      - ${MODELS_DIR}/fasttext:/models
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
