@@ -1,9 +1,11 @@
+import logging
+import warnings
+from pathlib import Path
+from typing import Any
+
+import fasttext
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import fasttext
-import warnings
-import logging
-import os
 
 # Suppress fasttext warnings
 warnings.filterwarnings("ignore", message=".*warn_on_stderr.*")
@@ -21,7 +23,7 @@ MODEL_PATH = "/models/lid.176.bin"
 @app.on_event("startup")
 async def load_model():
     global model
-    if not os.path.exists(MODEL_PATH):
+    if not Path(MODEL_PATH).exists():
         logger.error(f"Model file not found at {MODEL_PATH}")
         raise RuntimeError(
             "Model file not found. Please ensure download_model.py ran successfully."
@@ -72,7 +74,7 @@ async def detect_language(input_data: TextInput):
 
     results = [
         LanguageDetection(language=lang, confidence=conf)
-        for lang, conf in zip(languages, confidences)
+        for lang, conf in zip(languages, confidences, strict=True)
     ]
 
     return DetectionResponse(predictions=results)
@@ -98,7 +100,7 @@ async def batch_detect_language(texts: list[str], k: int = 1):
     if k < 1 or k > 10:
         raise HTTPException(status_code=400, detail="k must be between 1 and 10")
 
-    results = []
+    results: list[dict[str, Any]] = []
     for text in texts:
         if not text.strip():
             results.append({"predictions": []})
@@ -110,7 +112,7 @@ async def batch_detect_language(texts: list[str], k: int = 1):
 
         text_results = [
             {"language": lang, "confidence": conf}
-            for lang, conf in zip(languages, confidences)
+            for lang, conf in zip(languages, confidences, strict=True)
         ]
         results.append({"predictions": text_results})
 

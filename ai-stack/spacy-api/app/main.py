@@ -2,8 +2,8 @@
 FastAPI + spaCy NER API.
 Supports: en, fr, de, nl, ru (md models); ar, ms use multilingual NER (xx_ent_wiki_sm).
 """
+
 from contextlib import asynccontextmanager
-from typing import Optional
 
 import spacy
 from fastapi import FastAPI, HTTPException
@@ -21,7 +21,15 @@ MODELS = {
 }
 SUPPORTED_LANGS = list(MODELS.keys())
 # Load with NER only to save memory (disable tagger, parser, lemmatizer, etc.)
-DISABLE = ["tok2vec", "tagger", "morphologizer", "parser", "attribute_ruler", "lemmatizer", "senter"]
+DISABLE = [
+    "tok2vec",
+    "tagger",
+    "morphologizer",
+    "parser",
+    "attribute_ruler",
+    "lemmatizer",
+    "senter",
+]
 
 
 def load_nlp(lang: str):
@@ -29,7 +37,9 @@ def load_nlp(lang: str):
     try:
         nlp = spacy.load(model_name, exclude=DISABLE)
     except OSError:
-        raise RuntimeError(f"Model {model_name} not found. Run: python -m spacy download {model_name}")
+        raise RuntimeError(
+            f"Model {model_name} not found. Run: python -m spacy download {model_name}"
+        )
     return nlp
 
 

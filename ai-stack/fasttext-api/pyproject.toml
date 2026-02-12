@@ -10,6 +10,29 @@ dependencies = [
     "numpy<2.0",  # Pin to numpy 1.x for fasttext compatibility
 ]
 
+[project.optional-dependencies]
+dev = ["ruff>=0.8.0", "mypy>=1.13.0"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [".venv", "venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "TCH", "PTH", "N", "W"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+
+[tool.hatch.build.targets.wheel]
+packages = []
+force-include = { "app.py" = "app.py", "download_model.py" = "download_model.py" }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
